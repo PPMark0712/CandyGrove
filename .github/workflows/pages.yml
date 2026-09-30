@@ -1,0 +1,60 @@
+name: Test and deploy Godot Web
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Godot 4.7.2
+        shell: bash
+        run: |
+          mkdir -p .tools/godot
+          curl --fail --location --retry 3 \
+            https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip \
+            --output .tools/godot.zip
+          unzip -q .tools/godot.zip -d .tools/godot
+          chmod +x .tools/godot/Godot_v4.7.2-stable_linux.x86_64
+          echo "GODOT_BIN=$GITHUB_WORKSPACE/.tools/godot/Godot_v4.7.2-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - uses: actions/cache@v4
+        with:
+          path: .tools/templates
+          key: godot-web-templates-4.7.2
+      - name: Verify rules, AI, and turn lifecycle
+        run: python3 tools/web.py test
+      - name: Export real Godot Web build
+        run: python3 tools/web.py build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
