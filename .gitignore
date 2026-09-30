@@ -1,0 +1,7 @@
+/plan.md
+/.godot/
+/.tools/
+/build/
+*.tmp
+.DS_Store
+__pycache__/
