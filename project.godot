@@ -9,10 +9,8 @@ config/description="A small game of sweet decisions. Cut a candy and its branch;
 config/auto_accept_quit=true
 
 [application/boot_splash]
-image="res://assets/candy_grove_splash.png"
 bg_color=Color(0.969, 0.957, 0.937, 1)
-fullsize=true
-use_filter=true
+show_image=false
 
 [display]
 window/size/viewport_width=1440
