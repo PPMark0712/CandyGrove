@@ -6,6 +6,7 @@ const Forest = preload("res://scripts/forest.gd")
 const INK := Color("#393346")
 const MUTED := Color("#89818c")
 const PURPLE := Color("#7960aa")
+const CUT_RED := Color("#d9545d")
 const PAPER := Color("#f8f5ef")
 const BOARD := Rect2(36, 190, 1368, 570)
 const COLORS := [
@@ -510,14 +511,19 @@ func _draw_board() -> void:
 		)
 		_center(TREE_NAMES[t], Vector2(center_x, 222), 10, COLORS[t].darkened(0.36))
 		if forest.alive[root]:
+			var stem_color := CUT_RED if hovered == root else Color("#dad2df")
 			draw_line(
 				Vector2(positions[root].x, 236),
 				Vector2(positions[root].x, positions[root].y - 11),
-				Color("#dad2df"),
-				1.5,
+				stem_color,
+				3.0 if hovered == root else 1.5,
 				true
 			)
-			draw_circle(Vector2(positions[root].x, 236), 2.5, COLORS[t])
+			draw_circle(
+				Vector2(positions[root].x, 236),
+				2.5,
+				CUT_RED if hovered == root else COLORS[t]
+			)
 		else:
 			_center("all picked", Vector2(center_x, 253), 11, MUTED)
 	var selected: Array[int] = []
@@ -534,7 +540,11 @@ func _draw_board() -> void:
 		var color := Color("#d5cdd8")
 		if selected.has(i):
 			color = COLORS[tree_indices[i]].darkened(0.10)
-		draw_line(positions[parent], positions[i], color, 2.5, true)
+		var line_width := 2.5
+		if i == hovered:
+			color = CUT_RED
+			line_width = 3.5
+		draw_line(positions[parent], positions[i], color, line_width, true)
 	for i in forest.parents.size():
 		if not forest.alive[i]:
 			continue
