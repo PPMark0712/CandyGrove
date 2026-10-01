@@ -694,17 +694,17 @@ func _draw_cut_marker(edge_start: Vector2, edge_end: Vector2) -> void:
 		)
 	var metal := Color("#25212b")
 	var pivot := marker + normal * 27.0
-	var handle_base := pivot + normal * 7.0
-	var upper_handle := handle_base + direction * 7.0
-	var lower_handle := handle_base - direction * 7.0
+	var handle_base := pivot + normal * 9.0
+	var upper_handle := handle_base + direction * 4.5
+	var lower_handle := handle_base - direction * 4.5
 	draw_line(pivot, upper_handle, metal, 2.8, true)
 	draw_line(pivot, lower_handle, metal, 2.8, true)
-	draw_circle(upper_handle, 4.6, CUT_RED)
-	draw_circle(lower_handle, 4.6, CUT_RED)
-	draw_circle(upper_handle, 2.0, PAPER)
-	draw_circle(lower_handle, 2.0, PAPER)
-	var upper_tip := marker + normal * 17.0 + direction * 7.5
-	var lower_tip := marker + normal * 17.0 - direction * 7.5
+	draw_circle(upper_handle, 4.2, CUT_RED)
+	draw_circle(lower_handle, 4.2, CUT_RED)
+	draw_circle(upper_handle, 1.8, PAPER)
+	draw_circle(lower_handle, 1.8, PAPER)
+	var upper_tip := marker + normal * 17.0 + direction * 2.7
+	var lower_tip := marker + normal * 17.0 - direction * 2.7
 	_draw_tapered_blade(pivot, upper_tip, 4.2, 0.8, metal)
 	_draw_tapered_blade(pivot, lower_tip, 4.2, 0.8, metal)
 	draw_circle(pivot, 2.4, metal)
