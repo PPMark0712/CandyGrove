@@ -703,8 +703,8 @@ func _draw_cut_marker(edge_start: Vector2, edge_end: Vector2) -> void:
 	draw_circle(lower_handle, 4.2, CUT_RED)
 	draw_circle(upper_handle, 1.8, PAPER)
 	draw_circle(lower_handle, 1.8, PAPER)
-	var upper_tip := marker + normal * 17.0 + direction * 2.7
-	var lower_tip := marker + normal * 17.0 - direction * 2.7
+	var upper_tip := marker + normal * 17.0 + direction * 4.7
+	var lower_tip := marker + normal * 17.0 - direction * 4.7
 	_draw_tapered_blade(pivot, upper_tip, 4.2, 0.8, metal)
 	_draw_tapered_blade(pivot, lower_tip, 4.2, 0.8, metal)
 	draw_circle(pivot, 2.4, metal)
