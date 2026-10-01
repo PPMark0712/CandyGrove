@@ -1,8 +1,30 @@
 # Candy Grove
 
-Godot **4.7.2** + GDScript 制作的糖果树 Nim 小游戏。打开即玩，没有主菜单。画面、动画、输入、树形 DP 与 AI 全部在 Godot 内实现；网页使用 Godot 官方模板导出的 WASM/PCK。
+[在线游玩](https://ppmark0712.github.io/CandyGrove/) · [GitHub 仓库](https://github.com/PPMark0712/CandyGrove)
 
-## 运行
+Candy Grove 是一款以糖果树为棋盘的单人组合策略游戏。玩家与森林 AI 轮流剪下糖果及其下方的整段树枝，拿走最后一颗糖果的一方获胜。规则简单，但每次剪枝都会改变整片森林的胜负结构。
+
+项目使用 **Godot 4.7.2** 与 GDScript 开发，可直接在浏览器中运行。画面、动画、输入、随机树生成、树形 DP 和 AI 均在 Godot 内实现，Web 版本通过官方模板导出为 WASM/PCK，不依赖外部图片或字体资源。
+
+## 在线游玩
+
+1. 打开 [Candy Grove 在线版](https://ppmark0712.github.io/CandyGrove/)。
+2. 等待 Godot Web 游戏加载完成；首次打开需要下载游戏文件。
+3. 点击任意糖果开始游戏。被点击的糖果及其全部后代会一起掉落，随后森林 AI 自动行动。
+
+建议使用支持 WebGL 2 的最新版 Chrome、Edge、Firefox 或 Safari。游戏无需安装，也不需要登录；桌面端可使用鼠标和快捷键，触屏设备可直接点击糖果及界面按钮。
+
+如果在线链接显示 404，说明 GitHub Pages 尚未完成首次部署。仓库维护者需要按下方 [GitHub Pages](#github-pages) 一节启用部署；普通玩家无需下载或运行源码。
+
+## 项目特色
+
+- **树上 Nim 玩法**：每次选择一个节点并删除整棵子树，初始局面保证玩家存在必胜策略。
+- **基于 SG 的 AI**：实时计算 Sprague-Grundy 值，在必胜局面寻找制胜剪法，在必败局面尽量延长对局。
+- **随机棋盘**：可配置 1–7 棵树、最大深度和每层宽度，随时生成新森林。
+- **完整回合控制**：支持整轮撤回、重玩同一局、剪枝范围预览、胜负动画和 SG 调试视图。
+- **浏览器即开即玩**：单线程 Godot Web 导出，不依赖 `SharedArrayBuffer` 或特殊响应头，可直接部署到 GitHub Pages。
+
+## 本地运行
 
 使用 Godot 4.7.2 打开 `project.godot`，按 F6/F5 运行主场景。
 
@@ -84,7 +106,7 @@ AI 严格按以下优先级选择：
 
 工作流安装匹配版本的 Godot，运行测试、导出 Web、上传 Pages artifact 并部署。PR 运行测试和导出，不部署。站点支持 `https://<用户名>.github.io/<仓库名>/` 子路径。也可以把 `build/web/` 整体托管到其他静态服务器。
 
-当前工程未绑定 GitHub 远程仓库，部署工作流已准备好；在线地址需要推送并启用 Pages 后才会产生。
+本项目的预期在线地址为 <https://ppmark0712.github.io/CandyGrove/>。首次部署完成后，可以在仓库右侧 **Deployments** 或 **Actions** 页面查看部署状态和最终地址。
 
 ## 文件
 
