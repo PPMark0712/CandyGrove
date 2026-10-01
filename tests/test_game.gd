@@ -67,6 +67,26 @@ func run() -> void:
 	key.keycode = KEY_R
 	game._input(key)
 	verify(game.moves_taken == 0 and game.history.is_empty(), "R restarts")
+	game.open_config()
+	verify(game.config_overlay.visible, "New grove opens its configuration")
+	verify(not game.is_processing(), "Configuration pauses the current turn")
+	game.tree_count_input.value = 7
+	game.depth_input.value = 6
+	game.width_input.value = 20
+	game._apply_config()
+	verify(not game.config_overlay.visible, "Generate closes configuration")
+	verify(game.forest.roots.size() == 7, "Configuration applies tree count")
+	verify(game.forest.max_depth() <= 6, "Configuration applies maximum depth")
+	verify(game.forest.layer_counts().max() <= 20, "Configuration applies layer width")
+	verify(game.forest.total_sg != 0, "Configured initial position is winning")
+	for tree in range(7):
+		verify(game.tree_indices.has(tree), "Every configured tree is laid out")
+	game.configured_tree_count = 4
+	game.configured_max_depth = 3
+	game.configured_layer_width = 12
+	game.new_game()
+	original = game.forest.alive.duplicate()
+	selected = game.forest.roots[0]
 	# Both possible terminal results, with undo after game over.
 	var single: Array[int] = [-1]
 	game.forest.setup(single)
@@ -90,23 +110,32 @@ func run() -> void:
 	verify(game.phase == game.Phase.FINISHED and game.winner == "The grove", "AI last pick wins")
 	game.undo()
 	verify(game.forest.remaining() == 2, "Undo AI victory restores both moves")
-	# Exercise generated layouts and actual hit regions.
-	for sample in 200:
-		game.new_game()
-		var first_y: float = game.positions[game.forest.roots[0]].y
-		for node in game.forest.roots:
-			verify(game.positions[node].y == first_y, "Roots align")
-		for i in game.positions.size():
-			verify(game.BOARD.grow(-30).has_point(game.positions[i]), "Candy inside frame")
-			verify(game._hit(game.positions[i]) == i, "Candy hit test reaches correct node")
-			for j in range(i):
-				verify(game.positions[i].distance_to(game.positions[j]) >= 38,
-					"Candy bodies must not overlap")
-		game.player_cut(game.forest.roots[0])
-		game.new_game()
-		game._process(10.0)
-		verify(game.moves_taken == 0 and game.phase == game.Phase.PLAYER,
-			"New grove cancels animation")
+	# Exercise generated layouts and actual hit regions at normal and maximum scale.
+	for settings in [[4, 3, 12, 100], [7, 6, 20, 100]]:
+		game.configured_tree_count = settings[0]
+		game.configured_max_depth = settings[1]
+		game.configured_layer_width = settings[2]
+		for sample in settings[3]:
+			game.new_game()
+			var first_y: float = game.positions[game.forest.roots[0]].y
+			for node in game.forest.roots:
+				verify(game.positions[node].y == first_y, "Roots align")
+			for i in game.positions.size():
+				verify(game.BOARD.grow(-20).has_point(game.positions[i]), "Candy inside frame")
+				verify(game._hit(game.positions[i]) == i, "Candy hit test reaches correct node")
+				for j in range(i):
+					if game.forest.depths[i] == game.forest.depths[j]:
+						verify(
+							game.positions[i].distance_to(game.positions[j]) >= 36,
+							"Candy bodies on a layer must not overlap"
+						)
+			game.player_cut(game.forest.roots[0])
+			game.new_game()
+			game._process(10.0)
+			verify(
+				game.moves_taken == 0 and game.phase == game.Phase.PLAYER,
+				"New grove cancels animation"
+			)
 	game.queue_free()
-	print("Game tests: animation/undo/restart/terminal/keys + 200 layouts, %d failures" % failures)
+	print("Game tests: config/animation/undo/terminal/keys + 200 layouts, %d failures" % failures)
 	quit(0 if failures == 0 else 1)

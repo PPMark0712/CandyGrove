@@ -19,6 +19,7 @@ func _initialize() -> void:
 			topology.append(rng.randi_range(-1, i - 1))
 		check_topology(topology)
 	check_random_ties()
+	check_generation_limits()
 	print("Forest tests: %d topologies, %d states, %d failures" % [
 		checked_forests, checked_states, failures
 	])
@@ -93,6 +94,14 @@ func check_topology(topology: Array[int]) -> void:
 			verify(game.sg[i] == oracle(mask & descendants[i]), "Subtree SG incorrect")
 			var after := mask & ~descendants[i]
 			verify(game.sg_after_cut(i) == oracle(after), "Ancestor update incorrect")
+			var projected := game.sg_path_after_cut(i)
+			game.remove(i)
+			for ancestor in projected:
+				verify(
+					game.sg[ancestor] == projected[ancestor],
+					"Hover SG projection disagrees with actual cut"
+				)
+			game.restore(snapshot)
 			var removed_count := 0
 			for j in topology.size():
 				if (mask & descendants[i]) & (1 << j):
@@ -121,3 +130,17 @@ func check_random_ties() -> void:
 	for attempt in 128:
 		seen[game.choose_ai(rng)] = true
 	verify(seen.size() == 4, "Losing-state ties must vary randomly")
+
+
+func check_generation_limits() -> void:
+	var game := Forest.new()
+	for tree_count in range(1, 8):
+		for maximum_depth in range(1, 7):
+			for width in [tree_count, 20]:
+				for sample in 4:
+					game.generate(rng, tree_count, maximum_depth, width)
+					verify(game.roots.size() == tree_count, "Generated tree count is wrong")
+					verify(game.max_depth() <= maximum_depth, "Generated tree is too deep")
+					verify(game.total_sg != 0, "Initial position must be winning")
+					for count in game.layer_counts():
+						verify(count <= width, "Generated layer is wider than its limit")

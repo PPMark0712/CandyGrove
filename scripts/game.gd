@@ -7,9 +7,12 @@ const INK := Color("#393346")
 const MUTED := Color("#89818c")
 const PURPLE := Color("#7960aa")
 const PAPER := Color("#f8f5ef")
-const BOARD := Rect2(48, 256, 1344, 484)
-const COLORS := [Color("#b2a0df"), Color("#eeaa96"), Color("#e5bf6f"), Color("#8dc5ae")]
-const TREE_NAMES := ["LAVENDER", "PEACH", "HONEY", "MINT"]
+const BOARD := Rect2(36, 190, 1368, 570)
+const COLORS := [
+	Color("#a996d7"), Color("#e99a83"), Color("#deb04d"), Color("#72b99a"),
+	Color("#d681a8"), Color("#70a9cf"), Color("#91b95f")
+]
+const TREE_NAMES := ["LAVENDER", "PEACH", "HONEY", "MINT", "BERRY", "SKY", "LIME"]
 const CUT_DURATION := 0.62
 const THINK_DURATION := 0.70
 const AIM_DURATION := 0.45
@@ -27,8 +30,12 @@ var cutting_player := true
 var history: Array[Dictionary] = []
 var positions: Array[Vector2] = []
 var tree_indices: Array[int] = []
+var tree_centers: Array[float] = []
 var moves_taken := 0
 var seed_value := 0
+var configured_tree_count := 4
+var configured_max_depth := 3
+var configured_layer_width := 12
 var note := "A little strategy. A few sweet decisions."
 var winner := ""
 var font: Font
@@ -36,6 +43,11 @@ var undo_button: Button
 var debug_button: Button
 var restart_button: Button
 var new_button: Button
+var config_overlay: ColorRect
+var tree_count_input: SpinBox
+var depth_input: SpinBox
+var width_input: SpinBox
+var config_was_processing := true
 
 
 func _ready() -> void:
@@ -43,10 +55,17 @@ func _ready() -> void:
 	rng.randomize()
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_create_buttons()
+	_create_config_panel()
 	new_game()
 
 
-func _button(text: String, rect: Rect2, callback: Callable, primary := false) -> Button:
+func _button(
+	text: String,
+	rect: Rect2,
+	callback: Callable,
+	primary := false,
+	parent: Control = self
+) -> Button:
 	var button := Button.new()
 	button.text = text
 	button.position = rect.position
@@ -69,25 +88,136 @@ func _button(text: String, rect: Rect2, callback: Callable, primary := false) ->
 		style.border_color = PURPLE if primary or state == "focus" else Color("#e3dce2")
 		button.add_theme_stylebox_override(state, style)
 	button.pressed.connect(callback)
-	add_child(button)
+	parent.add_child(button)
 	return button
 
 
 func _create_buttons() -> void:
-	restart_button = _button("Restart   R", Rect2(1050, 86, 148, 46), restart)
+	restart_button = _button("Restart   R", Rect2(1060, 40, 148, 42), restart)
 	restart_button.tooltip_text = "Replay this exact grove from the beginning"
-	new_button = _button("New grove  +", Rect2(1212, 86, 180, 46), new_game, true)
-	new_button.tooltip_text = "Generate a fresh set of four trees (N)"
-	undo_button = _button("Undo round   Z", Rect2(48, 778, 184, 46), undo)
+	new_button = _button("New grove  +", Rect2(1222, 40, 170, 42), open_config, true)
+	new_button.tooltip_text = "Configure and generate a fresh grove (N)"
+	undo_button = _button("Undo round   Z", Rect2(48, 782, 184, 42), undo)
 	undo_button.tooltip_text = "Undo your last choice and the AI reply, including an animation in progress"
-	debug_button = _button("Show SG   D", Rect2(244, 778, 164, 46), toggle_debug)
+	debug_button = _button("Show SG   D", Rect2(244, 782, 164, 42), toggle_debug)
 	debug_button.tooltip_text = "Show subtree Sprague–Grundy values and the forest XOR"
+
+
+func _create_config_panel() -> void:
+	config_overlay = ColorRect.new()
+	config_overlay.position = Vector2.ZERO
+	config_overlay.size = Vector2(1440, 900)
+	config_overlay.color = Color(0.12, 0.10, 0.16, 0.36)
+	config_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	config_overlay.visible = false
+	add_child(config_overlay)
+	var panel := Panel.new()
+	panel.position = Vector2(470, 244)
+	panel.size = Vector2(500, 412)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#fefcf8")
+	style.border_color = Color("#dcd3df")
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(8)
+	style.shadow_color = Color(0.15, 0.10, 0.20, 0.16)
+	style.shadow_size = 14
+	panel.add_theme_stylebox_override("panel", style)
+	config_overlay.add_child(panel)
+	var title := _label("New grove", Vector2(36, 40), 31, INK, panel)
+	title.size = Vector2(300, 44)
+	var close := _button("x", Rect2(440, 28, 36, 36), close_config, false, panel)
+	close.tooltip_text = "Close"
+	tree_count_input = _number_input("Trees", 1, 7, configured_tree_count, 104, panel)
+	depth_input = _number_input("Max depth", 1, 6, configured_max_depth, 178, panel)
+	width_input = _number_input("Layer width", 1, 20, configured_layer_width, 252, panel)
+	tree_count_input.value_changed.connect(_tree_count_changed)
+	_button("Cancel", Rect2(236, 338, 104, 44), close_config, false, panel)
+	_button("Generate", Rect2(352, 338, 124, 44), _apply_config, true, panel)
+
+
+func _label(
+	text: String,
+	at: Vector2,
+	size_px: int,
+	color: Color,
+	parent: Control
+) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.position = at
+	label.add_theme_font_size_override("font_size", size_px)
+	label.add_theme_color_override("font_color", color)
+	parent.add_child(label)
+	return label
+
+
+func _number_input(
+	label_text: String,
+	minimum: int,
+	maximum: int,
+	value: int,
+	y: float,
+	parent: Control
+) -> SpinBox:
+	var label := _label(label_text, Vector2(38, y + 11), 17, MUTED, parent)
+	label.size = Vector2(180, 34)
+	var input := SpinBox.new()
+	input.position = Vector2(290, y)
+	input.size = Vector2(172, 46)
+	input.min_value = minimum
+	input.max_value = maximum
+	input.step = 1
+	input.value = value
+	input.allow_greater = false
+	input.allow_lesser = false
+	input.add_theme_font_size_override("font_size", 17)
+	parent.add_child(input)
+	return input
+
+
+func open_config() -> void:
+	if config_overlay.visible:
+		return
+	config_was_processing = is_processing()
+	set_process(false)
+	tree_count_input.value = configured_tree_count
+	depth_input.value = configured_max_depth
+	width_input.min_value = configured_tree_count
+	width_input.value = maxi(configured_layer_width, configured_tree_count)
+	config_overlay.visible = true
+	tree_count_input.get_line_edit().grab_focus()
+
+
+func close_config() -> void:
+	config_overlay.visible = false
+	set_process(config_was_processing)
+
+
+func _tree_count_changed(value: float) -> void:
+	width_input.min_value = value
+	if width_input.value < value:
+		width_input.value = value
+
+
+func _apply_config() -> void:
+	configured_tree_count = int(tree_count_input.value)
+	configured_max_depth = int(depth_input.value)
+	configured_layer_width = maxi(configured_tree_count, int(width_input.value))
+	config_overlay.visible = false
+	new_game()
+	set_process(config_was_processing)
 
 
 func new_game() -> void:
 	seed_value = rng.randi()
 	rng.seed = seed_value
-	forest.generate(rng)
+	forest.generate(
+		rng,
+		configured_tree_count,
+		configured_max_depth,
+		configured_layer_width
+	)
+	assert(forest.total_sg != 0)
 	_reset()
 	_layout_forest()
 	queue_redraw()
@@ -146,33 +276,62 @@ func _sync_controls() -> void:
 func _layout_forest() -> void:
 	positions.resize(forest.parents.size())
 	tree_indices.resize(forest.parents.size())
+	tree_indices.fill(-1)
+	tree_centers.clear()
+	var tree_layers: Array = []
+	var weights: Array[float] = []
 	for t in forest.roots.size():
 		var root: int = forest.roots[t]
-		var widths := {}
-		_leaf_width(root, widths)
-		var left := 84.0 + t * 326.0
-		_place(root, left, left + 294.0, 0, t, widths)
+		var layers: Array = []
+		_collect_layers(root, 0, t, layers)
+		tree_layers.append(layers)
+		var widest := 1
+		for layer in layers:
+			widest = maxi(widest, layer.size())
+		weights.append(float(widest))
+	var inner_left := BOARD.position.x + 24.0
+	var inner_width := BOARD.size.x - 48.0
+	var gap := 8.0
+	var usable := inner_width - gap * maxi(0, forest.roots.size() - 1)
+	var total_weight: float = weights.reduce(func(sum, value): return sum + value, 0.0)
+	var cursor := inner_left
+	var root_y := BOARD.position.y + 62.0
+	var depth_gap := 78.0
+	if forest.max_depth() > 0:
+		depth_gap = minf(
+			depth_gap,
+			(BOARD.end.y - 31.0 - root_y) / float(forest.max_depth())
+		)
+	for t in forest.roots.size():
+		var segment_width: float = usable * weights[t] / total_weight
+		var center := cursor + segment_width / 2.0
+		tree_centers.append(center)
+		var layers: Array = tree_layers[t]
+		var slot_width := segment_width / weights[t]
+		for depth in layers.size():
+			var layer: Array = layers[depth]
+			var layer_width := slot_width * layer.size()
+			var start := center - layer_width / 2.0 + slot_width / 2.0
+			for rank in layer.size():
+				positions[layer[rank]] = Vector2(
+					start + rank * slot_width,
+					root_y + depth * depth_gap
+				)
+		cursor += segment_width + gap
 
 
-func _leaf_width(node: int, widths: Dictionary) -> int:
-	var width := 0
-	for child in forest.children[node]:
-		width += _leaf_width(child, widths)
-	widths[node] = maxi(1, width)
-	return widths[node]
-
-
-func _place(node: int, left: float, right: float, depth: int, tree: int, widths: Dictionary) -> void:
-	positions[node] = Vector2((left + right) / 2.0, 384.0 + depth * 94.0)
+func _collect_layers(node: int, depth: int, tree: int, layers: Array) -> void:
+	while layers.size() <= depth:
+		layers.append([])
+	layers[depth].append(node)
 	tree_indices[node] = tree
-	var cursor := left
 	for child in forest.children[node]:
-		var span: float = (right - left) * float(widths[child]) / float(widths[node])
-		_place(child, cursor, cursor + span, depth + 1, tree, widths)
-		cursor += span
+		_collect_layers(child, depth + 1, tree, layers)
 
 
 func _gui_input(event: InputEvent) -> void:
+	if config_overlay.visible:
+		return
 	if event is InputEventMouseMotion:
 		var target := _hit(event.position) if phase == Phase.PLAYER else -1
 		if target != hovered:
@@ -194,6 +353,11 @@ func _input(event: InputEvent) -> void:
 		# Preserve browser shortcuts such as Cmd+R / Ctrl+R.
 		if event.ctrl_pressed or event.meta_pressed or event.alt_pressed:
 			return
+		if config_overlay.visible:
+			if event.keycode == KEY_ESCAPE:
+				close_config()
+				get_viewport().set_input_as_handled()
+			return
 		match event.keycode:
 			KEY_Z:
 				undo()
@@ -202,7 +366,7 @@ func _input(event: InputEvent) -> void:
 			KEY_D:
 				toggle_debug()
 			KEY_N:
-				new_game()
+				open_config()
 			_:
 				return
 		get_viewport().set_input_as_handled()
@@ -210,7 +374,8 @@ func _input(event: InputEvent) -> void:
 
 func _hit(point: Vector2) -> int:
 	for i in positions.size():
-		if forest.alive[i] and positions[i].distance_to(point) <= 25.0:
+		var offset := point - positions[i]
+		if forest.alive[i] and absf(offset.x) <= 24.0 and absf(offset.y) <= 16.0:
 			return i
 	return -1
 
@@ -294,11 +459,9 @@ func _draw() -> void:
 
 
 func _draw_header() -> void:
-	_candy(Vector2(65, 43), COLORS[0], 0.65, -0.25, 1.0, 0)
-	_text("T H E   L I T T L E   S T R A T E G Y   C L U B", Vector2(94, 49), 13, PURPLE)
-	_text("Candy Grove", Vector2(48, 127), 55)
-	_text("Pick a candy. Take its branch. Leave nothing behind.", Vector2(51, 164), 19, MUTED)
-	draw_line(Vector2(48, 190), Vector2(1392, 190), Color("#e2dce0"), 1)
+	_text("Candy Grove", Vector2(42, 78), 44)
+	_text("Pick a candy. Take its branch. Leave nothing behind.", Vector2(44, 111), 17, MUTED)
+	draw_line(Vector2(42, 138), Vector2(1398, 138), Color("#e2dce0"), 1)
 	var turn_title := "Your turn"
 	var turn_hint := "Choose a candy to snip"
 	var dot_color := Color("#80b69d")
@@ -318,33 +481,52 @@ func _draw_header() -> void:
 		Phase.FINISHED:
 			turn_title = "You win!" if winner == "You" else "The grove wins"
 			turn_hint = "The last candy decides it"
-	draw_circle(Vector2(61, 225), 5, dot_color)
-	_text(turn_title, Vector2(79, 233), 23)
-	_text(turn_hint, Vector2(282, 232), 17, MUTED)
-	_panel(Rect2(1154, 207, 238, 35), Color("#eee8f1"), 17)
-	_center("%02d candies   /   %02d moves" % [forest.remaining(), moves_taken], Vector2(1273, 231), 16, PURPLE)
+	draw_circle(Vector2(49, 164), 5, dot_color)
+	_text(turn_title, Vector2(67, 172), 21)
+	_text(turn_hint, Vector2(252, 171), 16, MUTED)
+	_panel(Rect2(1160, 148, 238, 32), Color("#eee8f1"), 16)
+	_center(
+		"%02d candies   /   %02d moves" % [forest.remaining(), moves_taken],
+		Vector2(1279, 170),
+		15,
+		PURPLE
+	)
 
 
 func _draw_board() -> void:
 	_panel(BOARD, Color("#fefcf8"), 22, Color("#e4dde2"))
 	# Small, quiet dot grid gives the strings a little depth.
-	for x in range(72, 1380, 26):
-		for y in range(278, 726, 26):
+	for x in range(58, 1390, 26):
+		for y in range(208, 748, 26):
 			draw_circle(Vector2(x, y), 0.85, Color("#ebe6e8"))
 	for t in forest.roots.size():
 		var root: int = forest.roots[t]
-		var center_x := 231.0 + t * 326.0
-		_panel(Rect2(center_x - 68, 282, 136, 30), COLORS[t].lightened(0.82), 15)
-		_center(TREE_NAMES[t], Vector2(center_x, 302), 12, COLORS[t].darkened(0.36))
+		var center_x: float = tree_centers[t]
+		var label_width := minf(116.0, BOARD.size.x / forest.roots.size() - 16.0)
+		_panel(
+			Rect2(center_x - label_width / 2.0, 204, label_width, 26),
+			COLORS[t].lightened(0.82),
+			13
+		)
+		_center(TREE_NAMES[t], Vector2(center_x, 222), 10, COLORS[t].darkened(0.36))
 		if forest.alive[root]:
-			draw_line(Vector2(positions[root].x, 333), positions[root], Color("#dad2df"), 2, true)
-			draw_circle(Vector2(positions[root].x, 333), 3, COLORS[t])
+			draw_line(
+				Vector2(positions[root].x, 236),
+				Vector2(positions[root].x, positions[root].y - 11),
+				Color("#dad2df"),
+				1.5,
+				true
+			)
+			draw_circle(Vector2(positions[root].x, 236), 2.5, COLORS[t])
 		else:
-			_center("all picked", Vector2(center_x, 353), 14, MUTED)
+			_center("all picked", Vector2(center_x, 253), 11, MUTED)
 	var selected: Array[int] = []
 	var focus_node := hovered if phase == Phase.PLAYER else aimed
+	var projected := {}
 	if focus_node >= 0:
 		selected = forest.subtree(focus_node)
+		if debug_mode and hovered >= 0:
+			projected = forest.sg_path_after_cut(hovered)
 	for i in forest.parents.size():
 		if not forest.alive[i] or forest.parents[i] < 0:
 			continue
@@ -358,13 +540,38 @@ func _draw_board() -> void:
 			continue
 		var position_i := positions[i]
 		if selected.has(i):
-			draw_circle(position_i, 29, Color(COLORS[tree_indices[i]], 0.16))
+			_ellipse(position_i, 25.0, Color(COLORS[tree_indices[i]], 0.16), 1.15, 0.70)
 			if i == focus_node:
-				draw_arc(position_i, 30, 0, TAU, 64, COLORS[tree_indices[i]].darkened(0.12), 1.7, true)
-		_candy(position_i, COLORS[tree_indices[i]], 1.08 if i == focus_node else 1.0, 0.0, 1.0, tree_indices[i])
+				draw_set_transform(position_i, 0.0, Vector2(1.15, 0.70))
+				draw_arc(
+					Vector2.ZERO,
+					25,
+					0,
+					TAU,
+					48,
+					COLORS[tree_indices[i]].darkened(0.12),
+					1.5,
+					true
+				)
+				draw_set_transform(Vector2.ZERO)
+		_candy(
+			position_i,
+			COLORS[tree_indices[i]],
+			1.06 if i == focus_node else 1.0,
+			0.0,
+			1.0,
+			tree_indices[i]
+		)
 		if debug_mode:
-			_panel(Rect2(position_i + Vector2(-19, 25), Vector2(38, 20)), Color("#eee8f5"), 6)
-			_center("g:%d" % forest.sg[i], position_i + Vector2(0, 40), 12, PURPLE)
+			var sg_text := "g:%d" % forest.sg[i]
+			var label_color := PURPLE
+			var background := Color("#eee8f5")
+			if projected.has(i):
+				sg_text = "%d>%d" % [forest.sg[i], int(projected[i])]
+				label_color = Color("#a15178")
+				background = Color("#f6e2eb")
+			_panel(Rect2(position_i + Vector2(-18, 17), Vector2(36, 16)), background, 5)
+			_center(sg_text, position_i + Vector2(0, 29), 9, label_color)
 	if phase == Phase.CUTTING:
 		_draw_cut()
 	if phase == Phase.FINISHED:
@@ -388,30 +595,44 @@ func _draw_cut() -> void:
 		_candy(origin, COLORS[tree_indices[i]], 1.0 - 0.3 * progress, sin(float(i)) * progress, opacity, tree_indices[i])
 		for spark in 3:
 			var direction := Vector2.from_angle(float(spark) * TAU / 3.0 + float(i))
-			draw_circle(positions[i] + direction * (22 + progress * 42), 2.6 * opacity, Color(COLORS[tree_indices[i]], opacity))
+			draw_circle(
+				positions[i] + direction * (18 + progress * 36),
+				2.2 * opacity,
+				Color(COLORS[tree_indices[i]], opacity)
+			)
 
 
 func _candy(at: Vector2, color: Color, scale_value: float, angle: float, opacity: float, kind: int) -> void:
-	draw_set_transform(at, angle, Vector2.ONE * scale_value)
+	draw_set_transform(at, angle, Vector2(1.05, 0.68) * scale_value)
 	var tint := Color(color, opacity)
 	var dark := Color(color.darkened(0.16), opacity)
 	var light := Color(color.lightened(0.45), opacity)
-	var wrapper_left := PackedVector2Array([Vector2(-14, 0), Vector2(-27, -11), Vector2(-25, 0), Vector2(-27, 11)])
-	var wrapper_right := PackedVector2Array([Vector2(14, 0), Vector2(27, -11), Vector2(25, 0), Vector2(27, 11)])
+	var wrapper_left := PackedVector2Array([
+		Vector2(-12, 0), Vector2(-22, -10), Vector2(-20, 0), Vector2(-22, 10)
+	])
+	var wrapper_right := PackedVector2Array([
+		Vector2(12, 0), Vector2(22, -10), Vector2(20, 0), Vector2(22, 10)
+	])
 	draw_colored_polygon(wrapper_left, light)
 	draw_colored_polygon(wrapper_right, light)
-	draw_line(Vector2(-25, -6), Vector2(-17, 0), tint, 1.0, true)
-	draw_line(Vector2(25, 6), Vector2(17, 0), tint, 1.0, true)
-	draw_circle(Vector2(0, 3), 17, Color(0.28, 0.21, 0.34, 0.08 * opacity))
-	draw_circle(Vector2.ZERO, 17, dark)
-	draw_circle(Vector2(0, -1), 15.5, tint)
+	draw_line(Vector2(-20, -5), Vector2(-14, 0), tint, 1.0, true)
+	draw_line(Vector2(20, 5), Vector2(14, 0), tint, 1.0, true)
+	draw_circle(Vector2(0, 2), 14, Color(0.28, 0.21, 0.34, 0.08 * opacity))
+	draw_circle(Vector2.ZERO, 14, dark)
+	draw_circle(Vector2(0, -1), 12.8, tint)
 	if kind % 2 == 0:
-		draw_arc(Vector2.ZERO, 9, -1.2, 3.8, 32, light, 3.2, true)
-		draw_arc(Vector2(0, 0), 4, 1.5, 5.7, 24, light, 2.5, true)
+		draw_arc(Vector2.ZERO, 7.5, -1.2, 3.8, 28, light, 2.7, true)
+		draw_arc(Vector2.ZERO, 3.5, 1.5, 5.7, 20, light, 2.0, true)
 	else:
-		draw_line(Vector2(-8, -10), Vector2(7, 10), light, 4.5, true)
-		draw_line(Vector2(0, -12), Vector2(11, 3), light, 3.0, true)
-	draw_circle(Vector2(-6, -8), 3.0, Color(1, 1, 1, 0.55 * opacity))
+		draw_line(Vector2(-7, -8), Vector2(6, 8), light, 3.5, true)
+		draw_line(Vector2(0, -10), Vector2(9, 2), light, 2.5, true)
+	draw_circle(Vector2(-5, -7), 2.4, Color(1, 1, 1, 0.55 * opacity))
+	draw_set_transform(Vector2.ZERO)
+
+
+func _ellipse(at: Vector2, radius: float, color: Color, x_scale: float, y_scale: float) -> void:
+	draw_set_transform(at, 0.0, Vector2(x_scale, y_scale))
+	draw_circle(Vector2.ZERO, radius, color)
 	draw_set_transform(Vector2.ZERO)
 
 
@@ -422,15 +643,19 @@ func _draw_footer() -> void:
 			forest.subtree_sizes[hovered],
 			"candy" if forest.subtree_sizes[hovered] == 1 else "candies"
 		]
-	_text(caption, Vector2(437, 807), 18, PURPLE)
+	_text(caption, Vector2(437, 807), 17, PURPLE)
 	if debug_mode:
 		var root_values: Array[String] = []
 		for root in forest.roots:
 			root_values.append(str(forest.sg[root]))
-		_text("SG  %s = %d   |   %s to move" % [
-			" xor ".join(root_values), forest.total_sg,
+		var debug_text := "SG  %s = %d   |   %s to move" % [
+			" xor ".join(root_values),
+			forest.total_sg,
 			"WINNING" if forest.total_sg != 0 else "LOSING"
-		], Vector2(51, 862), 15, PURPLE)
+		]
+		if hovered >= 0 and phase == Phase.PLAYER:
+			debug_text += "   |   after cut = %d" % forest.sg_after_cut(hovered)
+		_text(debug_text, Vector2(51, 862), 13, PURPLE)
 	else:
 		_text("HOW TO PLAY", Vector2(51, 860), 12, PURPLE)
 		_text("Take a candy and everything below it. You and the grove alternate. Last pick wins.", Vector2(161, 860), 15, MUTED)
