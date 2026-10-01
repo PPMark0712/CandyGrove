@@ -667,15 +667,19 @@ func _draw_cut_marker(edge_start: Vector2, edge_end: Vector2) -> void:
 			1.7,
 			true
 		)
-	var pivot := marker + normal * 17.0
-	var handle_base := pivot + normal * 5.0
-	draw_circle(handle_base + direction * 3.2, 2.8, CUT_RED)
-	draw_circle(handle_base - direction * 3.2, 2.8, CUT_RED)
-	draw_circle(handle_base + direction * 3.2, 1.25, PAPER)
-	draw_circle(handle_base - direction * 3.2, 1.25, PAPER)
-	draw_line(pivot, marker + normal * 2.0 + direction * 2.2, Color("#25212b"), 1.6, true)
-	draw_line(pivot, marker + normal * 2.0 - direction * 2.2, Color("#25212b"), 1.6, true)
-	draw_circle(pivot, 1.7, Color("#25212b"))
+	var pivot := marker + normal * 26.0
+	var handle_base := pivot + normal * 6.0
+	draw_circle(handle_base + direction * 5.0, 4.2, CUT_RED)
+	draw_circle(handle_base - direction * 5.0, 4.2, CUT_RED)
+	draw_circle(handle_base + direction * 5.0, 1.8, PAPER)
+	draw_circle(handle_base - direction * 5.0, 1.8, PAPER)
+	var upper_tip := marker + normal * 17.0 + direction * 5.5
+	var lower_tip := marker + normal * 17.0 - direction * 5.5
+	draw_line(pivot, upper_tip, Color("#25212b"), 3.2, true)
+	draw_line(pivot, lower_tip, Color("#25212b"), 3.2, true)
+	draw_circle(upper_tip, 1.6, Color("#25212b"))
+	draw_circle(lower_tip, 1.6, Color("#25212b"))
+	draw_circle(pivot, 2.3, Color("#25212b"))
 
 
 func _draw_footer() -> void:
