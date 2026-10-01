@@ -8,6 +8,7 @@ const MUTED := Color("#89818c")
 const PURPLE := Color("#7960aa")
 const CUT_RED := Color("#c92f46")
 const PAPER := Color("#f8f5ef")
+const DESIGN_SIZE := Vector2(1440, 900)
 const BOARD := Rect2(36, 190, 1368, 570)
 const COLORS := [
 	Color("#a996d7"), Color("#e99a83"), Color("#deb04d"), Color("#72b99a"),
@@ -45,10 +46,12 @@ var debug_button: Button
 var restart_button: Button
 var new_button: Button
 var config_overlay: ColorRect
+var config_panel: Panel
 var tree_count_input: SpinBox
 var depth_input: SpinBox
 var width_input: SpinBox
 var config_was_processing := true
+var draw_offset := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -57,6 +60,8 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_create_buttons()
 	_create_config_panel()
+	resized.connect(_update_layout)
+	_update_layout()
 	new_game()
 
 
@@ -112,9 +117,9 @@ func _create_config_panel() -> void:
 	config_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	config_overlay.visible = false
 	add_child(config_overlay)
-	var panel := Panel.new()
-	panel.position = Vector2(470, 244)
-	panel.size = Vector2(500, 412)
+	config_panel = Panel.new()
+	config_panel.position = Vector2(470, 244)
+	config_panel.size = Vector2(500, 412)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color("#fefcf8")
 	style.border_color = Color("#dcd3df")
@@ -122,18 +127,34 @@ func _create_config_panel() -> void:
 	style.set_corner_radius_all(8)
 	style.shadow_color = Color(0.15, 0.10, 0.20, 0.16)
 	style.shadow_size = 14
-	panel.add_theme_stylebox_override("panel", style)
-	config_overlay.add_child(panel)
-	var title := _label("New grove", Vector2(36, 40), 31, INK, panel)
+	config_panel.add_theme_stylebox_override("panel", style)
+	config_overlay.add_child(config_panel)
+	var title := _label("New grove", Vector2(36, 40), 31, INK, config_panel)
 	title.size = Vector2(300, 44)
-	var close := _button("x", Rect2(440, 28, 36, 36), close_config, false, panel)
+	var close := _button("x", Rect2(440, 28, 36, 36), close_config, false, config_panel)
 	close.tooltip_text = "Close"
-	tree_count_input = _number_input("Trees", 1, 7, configured_tree_count, 104, panel)
-	depth_input = _number_input("Max depth", 1, 6, configured_max_depth, 178, panel)
-	width_input = _number_input("Layer width", 1, 20, configured_layer_width, 252, panel)
+	tree_count_input = _number_input("Trees", 1, 7, configured_tree_count, 104, config_panel)
+	depth_input = _number_input("Max depth", 1, 6, configured_max_depth, 178, config_panel)
+	width_input = _number_input("Layer width", 1, 20, configured_layer_width, 252, config_panel)
 	tree_count_input.value_changed.connect(_tree_count_changed)
-	_button("Cancel", Rect2(236, 338, 104, 44), close_config, false, panel)
-	_button("Generate", Rect2(352, 338, 124, 44), _apply_config, true, panel)
+	_button("Cancel", Rect2(236, 338, 104, 44), close_config, false, config_panel)
+	_button("Generate", Rect2(352, 338, 124, 44), _apply_config, true, config_panel)
+
+
+func _update_layout() -> void:
+	draw_offset = Vector2(
+		maxf(0.0, (size.x - DESIGN_SIZE.x) / 2.0),
+		maxf(0.0, (size.y - DESIGN_SIZE.y) / 2.0)
+	)
+	if restart_button == null:
+		return
+	restart_button.position = draw_offset + Vector2(1060, 40)
+	new_button.position = draw_offset + Vector2(1222, 40)
+	undo_button.position = draw_offset + Vector2(48, 782)
+	debug_button.position = draw_offset + Vector2(244, 782)
+	config_overlay.size = size
+	config_panel.position = draw_offset + Vector2(470, 244)
+	queue_redraw()
 
 
 func _label(
@@ -334,17 +355,19 @@ func _gui_input(event: InputEvent) -> void:
 	if config_overlay.visible:
 		return
 	if event is InputEventMouseMotion:
-		var target := _hit(event.position) if phase == Phase.PLAYER else -1
+		var design_position: Vector2 = event.position - draw_offset
+		var target := _hit(design_position) if phase == Phase.PLAYER else -1
 		if target != hovered:
 			hovered = target
 			mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if hovered >= 0 else Control.CURSOR_ARROW
 			queue_redraw()
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		if phase == Phase.PLAYER:
-			var target := _hit(event.position)
+			var design_position: Vector2 = event.position - draw_offset
+			var target := _hit(design_position)
 			if target >= 0:
 				player_cut(target)
-			elif BOARD.has_point(event.position):
+			elif BOARD.has_point(design_position):
 				note = "Click a candy to take it and every candy below it."
 				queue_redraw()
 
@@ -454,9 +477,11 @@ func _draw() -> void:
 	if font == null:
 		return
 	draw_rect(Rect2(Vector2.ZERO, size), PAPER)
+	draw_set_transform(draw_offset)
 	_draw_header()
 	_draw_board()
 	_draw_footer()
+	draw_set_transform(Vector2.ZERO)
 
 
 func _draw_header() -> void:
@@ -559,7 +584,7 @@ func _draw_board() -> void:
 		if selected.has(i):
 			_ellipse(position_i, 25.0, Color(COLORS[tree_indices[i]], 0.16), 1.15, 0.70)
 			if i == focus_node:
-				draw_set_transform(position_i, 0.0, Vector2(1.15, 0.70))
+				draw_set_transform(draw_offset + position_i, 0.0, Vector2(1.15, 0.70))
 				draw_arc(
 					Vector2.ZERO,
 					25,
@@ -570,7 +595,7 @@ func _draw_board() -> void:
 					1.5,
 					true
 				)
-				draw_set_transform(Vector2.ZERO)
+				draw_set_transform(draw_offset)
 		_candy(
 			position_i,
 			COLORS[tree_indices[i]],
@@ -620,7 +645,7 @@ func _draw_cut() -> void:
 
 
 func _candy(at: Vector2, color: Color, scale_value: float, angle: float, opacity: float, kind: int) -> void:
-	draw_set_transform(at, angle, Vector2(1.05, 0.68) * scale_value)
+	draw_set_transform(draw_offset + at, angle, Vector2(1.05, 0.68) * scale_value)
 	var tint := Color(color, opacity)
 	var dark := Color(color.darkened(0.16), opacity)
 	var light := Color(color.lightened(0.45), opacity)
@@ -644,13 +669,13 @@ func _candy(at: Vector2, color: Color, scale_value: float, angle: float, opacity
 		draw_line(Vector2(-7, -8), Vector2(6, 8), light, 3.5, true)
 		draw_line(Vector2(0, -10), Vector2(9, 2), light, 2.5, true)
 	draw_circle(Vector2(-5, -7), 2.4, Color(1, 1, 1, 0.55 * opacity))
-	draw_set_transform(Vector2.ZERO)
+	draw_set_transform(draw_offset)
 
 
 func _ellipse(at: Vector2, radius: float, color: Color, x_scale: float, y_scale: float) -> void:
-	draw_set_transform(at, 0.0, Vector2(x_scale, y_scale))
+	draw_set_transform(draw_offset + at, 0.0, Vector2(x_scale, y_scale))
 	draw_circle(Vector2.ZERO, radius, color)
-	draw_set_transform(Vector2.ZERO)
+	draw_set_transform(draw_offset)
 
 
 func _draw_cut_marker(edge_start: Vector2, edge_end: Vector2) -> void:
@@ -667,19 +692,40 @@ func _draw_cut_marker(edge_start: Vector2, edge_end: Vector2) -> void:
 			1.7,
 			true
 		)
-	var pivot := marker + normal * 26.0
-	var handle_base := pivot + normal * 6.0
-	draw_circle(handle_base + direction * 5.0, 4.2, CUT_RED)
-	draw_circle(handle_base - direction * 5.0, 4.2, CUT_RED)
-	draw_circle(handle_base + direction * 5.0, 1.8, PAPER)
-	draw_circle(handle_base - direction * 5.0, 1.8, PAPER)
-	var upper_tip := marker + normal * 17.0 + direction * 5.5
-	var lower_tip := marker + normal * 17.0 - direction * 5.5
-	draw_line(pivot, upper_tip, Color("#25212b"), 3.2, true)
-	draw_line(pivot, lower_tip, Color("#25212b"), 3.2, true)
-	draw_circle(upper_tip, 1.6, Color("#25212b"))
-	draw_circle(lower_tip, 1.6, Color("#25212b"))
-	draw_circle(pivot, 2.3, Color("#25212b"))
+	var metal := Color("#25212b")
+	var pivot := marker + normal * 27.0
+	var handle_base := pivot + normal * 7.0
+	var upper_handle := handle_base + direction * 7.0
+	var lower_handle := handle_base - direction * 7.0
+	draw_line(pivot, upper_handle, metal, 2.8, true)
+	draw_line(pivot, lower_handle, metal, 2.8, true)
+	draw_circle(upper_handle, 4.6, CUT_RED)
+	draw_circle(lower_handle, 4.6, CUT_RED)
+	draw_circle(upper_handle, 2.0, PAPER)
+	draw_circle(lower_handle, 2.0, PAPER)
+	var upper_tip := marker + normal * 17.0 + direction * 7.5
+	var lower_tip := marker + normal * 17.0 - direction * 7.5
+	_draw_tapered_blade(pivot, upper_tip, 4.2, 0.8, metal)
+	_draw_tapered_blade(pivot, lower_tip, 4.2, 0.8, metal)
+	draw_circle(pivot, 2.4, metal)
+	draw_circle(pivot, 0.8, PAPER)
+
+
+func _draw_tapered_blade(
+	base: Vector2,
+	tip: Vector2,
+	base_width: float,
+	tip_width: float,
+	color: Color
+) -> void:
+	var axis := base.direction_to(tip)
+	var side := Vector2(-axis.y, axis.x)
+	draw_colored_polygon(PackedVector2Array([
+		base + side * base_width / 2.0,
+		base - side * base_width / 2.0,
+		tip - side * tip_width / 2.0,
+		tip + side * tip_width / 2.0
+	]), color)
 
 
 func _draw_footer() -> void:

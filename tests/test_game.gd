@@ -136,6 +136,23 @@ func run() -> void:
 				game.moves_taken == 0 and game.phase == game.Phase.PLAYER,
 				"New grove cancels animation"
 			)
+	game.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	game.size = Vector2(1800, 900)
+	game._update_layout()
+	verify(game.draw_offset == Vector2(180, 0), "Wide screens center the fixed design area")
+	verify(
+		game.restart_button.position == Vector2(1240, 40),
+		"Controls follow the centered design area"
+	)
+	verify(game.config_overlay.size == Vector2(1800, 900), "Configuration shade fills the screen")
+	var motion := InputEventMouseMotion.new()
+	motion.position = game.positions[game.forest.roots[0]] + game.draw_offset
+	game._gui_input(motion)
+	verify(game.hovered == game.forest.roots[0], "Mouse hit testing accounts for screen offset")
+	game.size = Vector2(1440, 1100)
+	game._update_layout()
+	verify(game.draw_offset == Vector2(0, 100), "Tall screens vertically center the design area")
+	verify(game.config_panel.position == Vector2(470, 344), "Configuration follows vertical offset")
 	game.queue_free()
-	print("Game tests: config/animation/undo/terminal/keys + 200 layouts, %d failures" % failures)
+	print("Game tests: responsive/config/animation/undo/terminal/keys + 200 layouts, %d failures" % failures)
 	quit(0 if failures == 0 else 1)
