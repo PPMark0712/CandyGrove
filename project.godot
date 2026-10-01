@@ -17,9 +17,13 @@ window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/dpi/allow_hidpi=true
 
+[gui]
+theme/default_font_multichannel_signed_distance_field=true
+
 [rendering]
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+anti_aliasing/quality/msaa_2d=2
 textures/default_filters/use_nearest_mipmap_filter=false
 environment/defaults/default_clear_color=Color(0.969, 0.957, 0.937, 1)
 renderer/threads/thread_model=0
