@@ -6,7 +6,7 @@ const Forest = preload("res://scripts/forest.gd")
 const INK := Color("#393346")
 const MUTED := Color("#89818c")
 const PURPLE := Color("#7960aa")
-const CUT_RED := Color("#d9545d")
+const CUT_RED := Color("#c92f46")
 const PAPER := Color("#f8f5ef")
 const BOARD := Rect2(36, 190, 1368, 570)
 const COLORS := [
@@ -524,6 +524,11 @@ func _draw_board() -> void:
 				2.5,
 				CUT_RED if hovered == root else COLORS[t]
 			)
+			if hovered == root:
+				_draw_cut_marker(
+					Vector2(positions[root].x, 236),
+					Vector2(positions[root].x, positions[root].y - 11)
+				)
 		else:
 			_center("all picked", Vector2(center_x, 253), 11, MUTED)
 	var selected: Array[int] = []
@@ -545,6 +550,8 @@ func _draw_board() -> void:
 			color = CUT_RED
 			line_width = 3.5
 		draw_line(positions[parent], positions[i], color, line_width, true)
+	if hovered >= 0 and forest.parents[hovered] >= 0:
+		_draw_cut_marker(positions[forest.parents[hovered]], positions[hovered])
 	for i in forest.parents.size():
 		if not forest.alive[i]:
 			continue
@@ -644,6 +651,31 @@ func _ellipse(at: Vector2, radius: float, color: Color, x_scale: float, y_scale:
 	draw_set_transform(at, 0.0, Vector2(x_scale, y_scale))
 	draw_circle(Vector2.ZERO, radius, color)
 	draw_set_transform(Vector2.ZERO)
+
+
+func _draw_cut_marker(edge_start: Vector2, edge_end: Vector2) -> void:
+	var direction := edge_start.direction_to(edge_end)
+	if direction.is_zero_approx():
+		return
+	var normal := Vector2(-direction.y, direction.x)
+	var marker := edge_start.lerp(edge_end, 0.62)
+	for offset in [-12.0, -5.0, 2.0, 9.0]:
+		draw_line(
+			marker + normal * offset,
+			marker + normal * (offset + 3.0),
+			Color("#25212b"),
+			1.7,
+			true
+		)
+	var pivot := marker + normal * 17.0
+	var handle_base := pivot + normal * 5.0
+	draw_circle(handle_base + direction * 3.2, 2.8, CUT_RED)
+	draw_circle(handle_base - direction * 3.2, 2.8, CUT_RED)
+	draw_circle(handle_base + direction * 3.2, 1.25, PAPER)
+	draw_circle(handle_base - direction * 3.2, 1.25, PAPER)
+	draw_line(pivot, marker + normal * 2.0 + direction * 2.2, Color("#25212b"), 1.6, true)
+	draw_line(pivot, marker + normal * 2.0 - direction * 2.2, Color("#25212b"), 1.6, true)
+	draw_circle(pivot, 1.7, Color("#25212b"))
 
 
 func _draw_footer() -> void:
