@@ -8,6 +8,12 @@ config/features=PackedStringArray("4.7", "GL Compatibility")
 config/description="A small game of sweet decisions. Cut a candy and its branch; take the last candy to win."
 config/auto_accept_quit=true
 
+[application/boot_splash]
+image="res://assets/candy_grove_splash.png"
+bg_color=Color(0.969, 0.957, 0.937, 1)
+fullsize=true
+use_filter=true
+
 [display]
 window/size/viewport_width=1440
 window/size/viewport_height=900
@@ -24,6 +30,7 @@ theme/default_font_multichannel_signed_distance_field=true
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 anti_aliasing/quality/msaa_2d=2
+anti_aliasing/quality/msaa_2d.web=0
 textures/default_filters/use_nearest_mipmap_filter=false
 environment/defaults/default_clear_color=Color(0.969, 0.957, 0.937, 1)
 renderer/threads/thread_model=0
