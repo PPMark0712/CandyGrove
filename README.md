@@ -1,4 +1,4 @@
-# Candy Grove · Tree Nim
+# Candy Grove
 
 Godot **4.7.2** + GDScript 制作的糖果树 Nim 小游戏。打开即玩，没有主菜单。画面、动画、输入、树形 DP 与 AI 全部在 Godot 内实现；网页使用 Godot 官方模板导出的 WASM/PCK。
 

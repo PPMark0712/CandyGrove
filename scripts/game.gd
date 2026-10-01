@@ -751,4 +751,4 @@ func _draw_footer() -> void:
 	else:
 		_text("HOW TO PLAY", Vector2(51, 860), 12, PURPLE)
 		_text("Take a candy and everything below it. You and the grove alternate. Last pick wins.", Vector2(161, 860), 15, MUTED)
-	_text("TREE NIM  /  %06d" % (seed_value % 1000000), Vector2(1202, 862), 12, MUTED)
+	_text("CANDY GROVE  /  %06d" % (seed_value % 1000000), Vector2(1172, 862), 12, MUTED)
